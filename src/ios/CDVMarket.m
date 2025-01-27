@@ -2,9 +2,11 @@
 //  CDVMarket.h
 //
 // Created by Miguel Revetria miguel@xmartlabs.com on 2014-03-17.
+// Updated by marinaweit 2025-01-27: Fixed deprecated openURL for ios18
 // License Apache 2.0
 
-#include "CDVMarket.h"
+
+#import "CDVMarket.h"
 
 @implementation CDVMarket
 
@@ -18,17 +20,29 @@
         NSArray *args = command.arguments;
         NSString *appId = [args objectAtIndex:0];
         
-        CDVPluginResult *pluginResult;
+        __block CDVPluginResult *pluginResult; 
+        
         if (appId) {
-            NSString *url = [NSString stringWithFormat:@"itms-apps://itunes.apple.com/app/%@", appId];
-            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:url]];
+            NSString *urlString = [NSString stringWithFormat:@"itms-apps://itunes.apple.com/app/%@", appId];
+            NSURL *url = [NSURL URLWithString:urlString];
             
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+            if ([[UIApplication sharedApplication] canOpenURL:url]) {
+                [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
+                    if (success) {
+                        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+                    } else {
+                        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Failed to open App Store"];
+                    }
+                    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                }];
+            } else {
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Cannot open URL"];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
         } else {
             pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Invalid application id: null was found"];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         }
-        
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
 }
 
